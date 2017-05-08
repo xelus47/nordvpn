@@ -1,5 +1,5 @@
 #!/usr/bin/env python2
-import os,sys
+import os,sys, subprocess
 
 def parse_argv(iii = sys.argv[1:],args=None):
 	if args is None:	
@@ -51,19 +51,19 @@ def parse_argv(iii = sys.argv[1:],args=None):
 				f = open(args['options']['config'],'w')
 				f.write("")
 				f.close()
-		if args['protocol']=='':
-			args['protocol']='tcp' # tcp default
+		#if args['protocol']=='':
+		#	args['protocol']='tcp' # tcp default
 	return args
 
 def generate_config(args=None):
 	out = []
 	if args is None:
 		args=parse_argv([])
-	for x in args['options']:
-		if args['options'][x]!="":
-			out.append("--"+x+" "+args['options'][x])
-	if args['options']['save']=='':
-		args['options']['save']='server,prot,auth'
+	#for x in args['options']:
+	#	if args['options'][x]!="" and x!='save':
+	#		out.append("--"+x+" "+args['options'][x])
+	#if args['options']['save']=='':
+	#	args['options']['save']='server,prot,auth'
 	if 'server' in args['options']['save']:
 		out.append(args['server'])
 	if 'prot' in args['options']['save']:
@@ -73,22 +73,65 @@ def generate_config(args=None):
 	
 	return " ".join(out)
 
+def make_command(args=None):
+	if args is None:
+		args=parse_argv([])
+	
+	cmd = "sudo openvpn"
+	assert args['protocol']!=''
+	if args['protocol']=='tcp':
+		n="443"
+	elif args['protocol']=='udp':
+		n="1194"
+	else:
+		print "Error: unsupported protocol: \"%s\""%args['protocol']
+		sys.exit(1)
+	path = "/etc/openvpn/%s.nordvpn.com.%s%s.ovpn"%(args['server'],args['protocol'],n)
+	cmd+=" --config "+path
+	
+	if args['auth']!='':
+		cmd+=" --auth-user-pass "+args['auth']
+
+	return cmd
+
+
+
+def save_config(args):	
+	data = generate_config(args)
+	f = open(args['options']['config'],'w')
+	f.write(data)
+	f.close()
+
 if __name__=="__main__":
 	args=parse_argv()
 	print args
 	
-	# inteprit config file afterwards, i.e. lower priority
+	# interprit config file afterwards, i.e. lower priority
 	f = open(args['options']['config'],'r')
 	data = f.read()
 	f.close()
 	print "-"*10
 	newargs = parse_argv(data.replace("\n"," ").split(" "),args)
-	print newargs
+	#print newargs
 	
 	if newargs['server']=='':
 		print "Please supply a server"
 		sys.exit(1)
 
+	if newargs['protocol']=='':
+		newargs['protocol']='tcp'
+
 	
 
+
+	#print generate_config(newargs)
+	#print "*"*10
+	cmd=make_command(newargs)
+	save_config(newargs)
+	print cmd
 	print generate_config(newargs)
+	try:
+		subprocess.call(cmd.split(" "))
+	except KeyboardInterrupt:
+		print "Exit..."
+		sys.exit()
